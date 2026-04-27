@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import os
+import urllib.parse
 from pathlib import Path
 
 import sys
@@ -98,6 +99,17 @@ def validate_scope(domain: str) -> bool:
     return True
 
 
+def clean_domain(domain: str) -> str:
+    """Clean user input to extract just the naked domain/hostname."""
+    domain = domain.strip().lower()
+    if domain.startswith("http://") or domain.startswith("https://"):
+        domain = urllib.parse.urlparse(domain).netloc
+    
+    # Strip any paths or ports
+    domain = domain.split('/')[0].split(':')[0]
+    return domain
+
+
 # ── Command handlers ──────────────────────────────────────────────────────────
 
 def cmd_setup(args):
@@ -113,7 +125,7 @@ def cmd_scan(args):
     log_level = config.get("general", {}).get("log_level", "INFO")
     setup_logging(log_level)
 
-    domain = args.domain.strip().lower()
+    domain = clean_domain(args.domain)
 
     if not validate_scope(domain):
         sys.exit(1)
@@ -157,7 +169,7 @@ def cmd_resume(args):
     config = load_config(args.config)
     setup_logging(config.get("general", {}).get("log_level", "INFO"))
 
-    domain = args.domain.strip().lower()
+    domain = clean_domain(args.domain)
     output_dir = config.get("general", {}).get("output_dir", "output")
     safe_domain = domain.replace(".", "_")
     state_file = Path(output_dir) / f"{safe_domain}_state.json"
@@ -193,7 +205,7 @@ def cmd_report(args):
     Reads saved state and regenerates the report without re-scanning.
     """
     config = load_config(args.config)
-    domain = args.domain.strip().lower()
+    domain = clean_domain(args.domain)
     output_dir = config.get("general", {}).get("output_dir", "output")
     safe_domain = domain.replace(".", "_")
     state_file = Path(output_dir) / f"{safe_domain}_state.json"
