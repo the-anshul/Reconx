@@ -36,7 +36,6 @@ def _install_via_go(tool: str, pkg: str) -> bool:
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=300,
             )
         if result.returncode == 0:
             console.print(f"  [green]✓ {tool} installed[/]")
@@ -44,8 +43,8 @@ def _install_via_go(tool: str, pkg: str) -> bool:
         else:
             console.print(f"  [red]✗ Failed: {result.stderr.strip()[:200]}[/]")
             return False
-    except subprocess.TimeoutExpired:
-        console.print(f"  [red]✗ Install timed out for {tool}[/]")
+    except Exception as e:
+        console.print(f"  [red]✗ Error: {e}[/]")
         return False
 
 
@@ -64,7 +63,7 @@ def _install_nmap() -> bool:
             return False
 
         with console.status(f"  [yellow]Installing nmap... Please wait[/]", spinner="dots"):
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             
         if result.returncode == 0:
             console.print("  [green]✓ nmap installed[/]")
