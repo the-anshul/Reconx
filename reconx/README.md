@@ -91,7 +91,18 @@ Domain
 
 ### Python Dependencies
 
+> ⚠️ **Kali / Debian users**: System Python is externally managed. Use a virtual environment:
+
 ```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate        # Linux/Mac
+# OR on Windows:
+.\venv\Scripts\activate
+
+# Install dependencies inside venv
 pip install -r requirements.txt
 ```
 
@@ -102,6 +113,9 @@ pip install -r requirements.txt
 ### 1. Check / Install Tools
 
 ```bash
+# Make sure venv is active first!
+source venv/bin/activate
+
 # Check what's installed
 python main.py setup
 
