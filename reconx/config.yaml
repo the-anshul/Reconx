@@ -1,0 +1,49 @@
+# ReconX Configuration
+# Edit karo apni environment ke liye
+
+general:
+  threads: 20
+  timeout: 30          # seconds per tool
+  output_dir: "output"
+  log_level: "INFO"    # DEBUG | INFO | WARNING | ERROR
+
+modules:
+  recon: true          # subfinder + amass
+  dns: true            # dnsx
+  http: true           # httpx
+  enum: true           # nmap
+  vuln: true           # nuclei
+
+tools:
+  subfinder:
+    path: "subfinder"
+    flags: "-silent"
+  amass:
+    path: "amass"
+    flags: "enum -passive"
+  dnsx:
+    path: "dnsx"
+    flags: "-silent -resp"
+  httpx:
+    path: "httpx"
+    flags: "-silent -status-code -tech-detect -title"
+  nmap:
+    path: "nmap"
+    flags: "-sV -T4 --open"
+    top_ports: 1000
+  nuclei:
+    path: "nuclei"
+    flags: "-silent"
+    severity: "low,medium,high,critical"
+    templates: ""      # leave empty = default templates
+
+safety:
+  max_subdomains: 500   # stop if too many found
+  max_concurrent: 10    # max parallel targets
+  confirm_active: true  # ask before active scan (nmap/nuclei)
+  scope_validation: true
+
+reporting:
+  formats:
+    - json
+  output_prefix: "reconx_report"
