@@ -30,13 +30,14 @@ def _has_go() -> bool:
 def _install_via_go(tool: str, pkg: str) -> bool:
     console.print(f"  [cyan]→ go install {pkg}[/]")
     try:
-        result = subprocess.run(
-            f"go install -v {pkg}",
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
+        with console.status(f"  [yellow]Downloading and compiling {tool}... (This may take a few minutes)[/]", spinner="dots"):
+            result = subprocess.run(
+                f"go install -v {pkg}",
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
         if result.returncode == 0:
             console.print(f"  [green]✓ {tool} installed[/]")
             return True
@@ -62,7 +63,9 @@ def _install_nmap() -> bool:
             console.print(f"  [yellow]⚠ Unsupported OS — install nmap manually: https://nmap.org[/]")
             return False
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+        with console.status(f"  [yellow]Installing nmap... Please wait[/]", spinner="dots"):
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+            
         if result.returncode == 0:
             console.print("  [green]✓ nmap installed[/]")
             return True
