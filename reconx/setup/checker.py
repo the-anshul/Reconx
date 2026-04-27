@@ -3,6 +3,7 @@ setup/checker.py — Tool availability checker.
 Checks if all required tools are installed and in PATH.
 """
 
+import os
 import shutil
 import subprocess
 import logging
@@ -49,12 +50,18 @@ REQUIRED_TOOLS = {
 def check_tool(name: str, version_flag: str) -> tuple[bool, str]:
     """Check if a tool is in PATH and get its version."""
     path = shutil.which(name)
+    
+    # Fallback for Go binaries if not in PATH
     if not path:
-        return False, "NOT FOUND"
+        go_path = os.path.expanduser(f"~/go/bin/{name}")
+        if os.path.exists(go_path):
+            path = go_path
+        else:
+            return False, "NOT FOUND"
 
     try:
         result = subprocess.run(
-            [name, version_flag],
+            [path, version_flag],
             capture_output=True,
             text=True,
             timeout=5,
