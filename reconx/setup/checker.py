@@ -24,7 +24,7 @@ REQUIRED_TOOLS = {
         "install_hint": "go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest",
         "critical": True,
     },
-    "httpx": {
+    "httpx-toolkit": {
         "version_flag": "-version",
         "install_hint": "go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest",
         "critical": True,

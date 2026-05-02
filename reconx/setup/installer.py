@@ -17,7 +17,7 @@ console = Console()
 GO_TOOLS = {
     "subfinder": "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
     "dnsx":      "github.com/projectdiscovery/dnsx/cmd/dnsx@latest",
-    "httpx":     "github.com/projectdiscovery/httpx/cmd/httpx@latest",
+    "httpx-toolkit": "github.com/projectdiscovery/httpx/cmd/httpx@latest",
     "nuclei":    "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
     "katana":    "github.com/projectdiscovery/katana/cmd/katana@latest",
     "assetfinder": "github.com/tomnomnom/assetfinder@latest",

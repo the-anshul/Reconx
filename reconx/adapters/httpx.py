@@ -18,7 +18,7 @@ async def run_httpx(hosts: list[str], timeout: int = 60) -> list[dict]:
         return []
 
     input_data = "\n".join(hosts)
-    cmd = "httpx -silent -status-code -tech-detect -title -follow-redirects -random-agent -json"
+    cmd = "httpx-toolkit -silent -status-code -tech-detect -title -follow-redirects -random-agent -json"
 
     logger.info(f"[httpx] Probing {len(hosts)} hosts...")
 

@@ -26,7 +26,7 @@ tools:
     path: "dnsx"
     flags: "-silent -resp"
   httpx:
-    path: "httpx"
+    path: "httpx-toolkit"
     flags: "-silent -status-code -tech-detect -title"
   nmap:
     path: "nmap"
