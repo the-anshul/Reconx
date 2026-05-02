@@ -44,6 +44,11 @@ REQUIRED_TOOLS = {
         "install_hint": "go install github.com/tomnomnom/assetfinder@latest",
         "critical": False,
     },
+    "whatweb": {
+        "version_flag": "--version",
+        "install_hint": "sudo apt-get install whatweb (Linux) or brew install whatweb (macOS)",
+        "critical": False,
+    },
     "nmap": {
         "version_flag": "--version",
         "install_hint": "https://nmap.org/download.html",

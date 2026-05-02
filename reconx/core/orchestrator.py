@@ -14,6 +14,7 @@ from modules.recon import run_recon
 from modules.enum import run_dns_enum, run_http_enum
 from modules.vuln import run_port_scan, run_vuln_scan
 from adapters.katana import run_katana
+from adapters.whatweb import run_whatweb
 from models.asset import Asset, PortInfo, VulnInfo
 
 logger = logging.getLogger("reconx.orchestrator")
@@ -26,71 +27,74 @@ def correlate(
     http_data: list[dict],
     port_data: dict[str, list[dict]],
     vuln_data: list[dict],
-) -> list[Asset]:
-    """
-    Intelligence layer — correlates all data into normalized Asset objects.
-    This is where raw data becomes actionable intelligence.
-    """
-    # Build lookup maps
-    dns_map = {d["domain"]: d for d in dns_data}
-    http_map = {h["domain"]: h for h in http_data}
-    # Also index by URL host for port mapping
-    http_url_map = {h["url"]: h for h in http_data}
-
-    assets = []
-
+def correlate(subdomains, dns_data, http_data, port_data, vuln_data, whatweb_data=None) -> list[Asset]:
+    """Combine data from all tools into a list of Asset objects."""
+    assets_dict: dict[str, Asset] = {}
+    
+    # Initialize assets from subdomains
     for sub in subdomains:
-        dns_info = dns_map.get(sub, {})
-        http_info = http_map.get(sub, {})
+        assets_dict[sub] = Asset(domain=sub)
 
-        # Get IP — try DNS first
-        ip = dns_info.get("ip")
+    # Merge DNS info
+    for d in dns_data:
+        domain = d.get("host")
+        if domain in assets_dict:
+            assets_dict[domain].ip = d.get("ip")
+            assets_dict[domain].cnames = d.get("cnames", [])
 
-        # Get ports — match by IP or domain
-        raw_ports = port_data.get(ip, []) or port_data.get(sub, [])
-        ports = [
-            PortInfo(
-                port=p["port"],
-                protocol=p.get("protocol", "tcp"),
-                service=p.get("service"),
-                version=p.get("version"),
-                state=p.get("state", "open"),
-            )
-            for p in raw_ports
-        ]
+    # Merge HTTP info
+    for h in http_data:
+        domain = h.get("input") or h.get("url", "").replace("http://", "").replace("https://", "").split("/")[0]
+        if domain in assets_dict:
+            assets_dict[domain].is_live = True
+            assets_dict[domain].http_status = h.get("status_code")
+            assets_dict[domain].http_url = h.get("url")
+            assets_dict[domain].technologies.extend(h.get("tech", []))
 
-        # Get vulns — match by URL or domain
-        url = http_info.get("url", "")
-        matched_vulns = [
-            v for v in vuln_data
-            if sub in v.get("matched_at", "") or url in v.get("matched_at", "")
-        ]
-        vulns = [
-            VulnInfo(
-                name=v["name"],
-                severity=v.get("severity", "info"),
-                template_id=v.get("template_id"),
-                description=v.get("description"),
-                matched_at=v.get("matched_at"),
-                cvss_score=v.get("cvss_score"),
-                tags=v.get("tags", []),
-            )
-            for v in matched_vulns
-        ]
+    # Merge WhatWeb tech info (Enrichment)
+    if whatweb_data:
+        for w in whatweb_data:
+            target = w.get("target", "")
+            domain = target.replace("http://", "").replace("https://", "").split("/")[0]
+            if domain in assets_dict:
+                # Extract plugin names as technologies
+                plugins = w.get("plugins", {})
+                new_techs = list(plugins.keys())
+                assets_dict[domain].technologies.extend(new_techs)
+                # Deduplicate
+                assets_dict[domain].technologies = list(set(assets_dict[domain].technologies))
 
-        asset = Asset(
-            domain=sub,
-            ip=ip,
-            is_live=bool(dns_info),
-            http_status=http_info.get("status"),
-            http_url=url,
-            technologies=http_info.get("technologies", []),
-            cnames=dns_info.get("cnames", []),
-            ports=ports,
-            vulns=vulns,
-        )
-        assets.append(asset)
+    # Merge Port info
+    for ip, raw_ports in port_data.items():
+        for asset in assets_dict.values():
+            if asset.ip == ip:
+                asset.ports = [
+                    PortInfo(
+                        port=p["port"],
+                        protocol=p.get("protocol", "tcp"),
+                        service=p.get("service"),
+                        version=p.get("version"),
+                        state=p.get("state", "open"),
+                    )
+                    for p in raw_ports
+                ]
 
+    # Merge Vuln info
+    for v in vuln_data:
+        matched = v.get("matched_at", "")
+        for asset in assets_dict.values():
+            if asset.domain in matched or (asset.http_url and asset.http_url in matched):
+                asset.vulns.append(VulnInfo(
+                    name=v["name"],
+                    severity=v.get("severity", "info"),
+                    template_id=v.get("template_id"),
+                    description=v.get("description"),
+                    matched_at=v.get("matched_at"),
+                    cvss_score=v.get("cvss_score"),
+                    tags=v.get("tags", []),
+                ))
+
+    assets = list(assets_dict.values())
     # Sort by vuln count descending (most interesting first)
     assets.sort(key=lambda a: len(a.vulns), reverse=True)
     return assets
@@ -104,7 +108,7 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
     output_dir = config.get("general", {}).get("output_dir", "output")
     state = StateManager(domain=domain, output_dir=output_dir)
 
-    phases = ["recon", "dns", "http", "ports", "vulns"]
+    phases = ["recon", "dns", "http", "ports", "vulns", "crawl", "whatweb"]
     state.set_pending(phases)
 
     with Progress(
@@ -148,12 +152,27 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
 
         if state.is_done("http") and resume:
             http_data = state.get_result("http")
-            console.print(f"  [dim]↩ HTTP: loaded {len(http_data)} services from state[/]")
+            console.print(f"  ✅ [green]HTTP:[/] {len(http_data)} web services detected")
         else:
             task = progress.add_task("[bold green]Phase 3: HTTP Probing...", total=None)
             http_data = await run_http_enum(live_hosts, config)
             state.mark_done("http", http_data)
             progress.remove_task(task)
+        
+        http_urls = [h["url"] for h in http_data if h.get("url")]
+
+    # ── PHASE 3.5: Fingerprinting (WhatWeb) ────────────────────────────
+    whatweb_data = []
+    if state.is_done("whatweb") and resume:
+        whatweb_data = state.get_result("whatweb")
+        console.print(f"  [dim]↩ WhatWeb: loaded from state[/]")
+    else:
+        if http_urls:
+            task = progress.add_task("[bold green]Phase 3.5: Advanced Fingerprinting (WhatWeb)...", total=None)
+            whatweb_data = await run_whatweb(http_urls, timeout=300)
+            state.mark_done("whatweb", whatweb_data)
+            progress.remove_task(task)
+            console.print(f"  ✅ [green]Fingerprint:[/] Detailed tech info collected")
 
     # ── PHASE 4: Crawling ───────────────────────────────────────────────
     crawled_urls = []
@@ -203,7 +222,7 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
 
     # ── CORRELATION ─────────────────────────────────────────────────────────
     console.print("\n[bold cyan]🔗 Correlating intelligence...[/]")
-    assets = correlate(subdomains, dns_data, http_data, port_data, vuln_data)
+    assets = correlate(subdomains, dns_data, http_data, port_data, vuln_data, whatweb_data)
     console.print(f"  ✅ [green]Assets built:[/] {len(assets)} total\n")
 
     return assets
