@@ -141,7 +141,7 @@ def save_json_report(domain: str, assets: list[Asset], output_dir: str = "output
 
 
 def generate_report(domain: str, assets: list[Asset], config: dict) -> str:
-    """Main reporting entry point — prints CLI + saves files."""
+    """Main reporting entry point — prints CLI + asks to save files."""
     print_summary(domain, assets)
 
     output_dir = config.get("general", {}).get("output_dir", "output")
@@ -149,6 +149,11 @@ def generate_report(domain: str, assets: list[Asset], config: dict) -> str:
 
     saved_path = ""
     if "json" in formats:
-        saved_path = save_json_report(domain, assets, output_dir)
+        console.print("\n[bold yellow]❓ Do you want to save the results to a JSON file? [y/N]: [/]", end="")
+        choice = input().strip().lower()
+        if choice == 'y':
+            saved_path = save_json_report(domain, assets, output_dir)
+        else:
+            console.print("[dim]Report saving skipped.[/]")
 
     return saved_path
