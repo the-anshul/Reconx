@@ -86,10 +86,13 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
     output_dir = config.get("general", {}).get("output_dir", "output")
     state = StateManager(domain=domain, output_dir=output_dir)
 
+    # Get timeout from config, if 0 then set to None (infinite)
+    t_config = config.get("general", {}).get("timeout", 300)
+    timeout = None if t_config == 0 else t_config
+
     phases = ["recon", "dns", "http", "whatweb", "crawl", "ports", "vulns"]
     state.set_pending(phases)
 
-    # Initialize all results to avoid NameError
     subdomains = []
     dns_data = []
     http_data = []
@@ -147,7 +150,7 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
             whatweb_data = state.get_result("whatweb")
         elif http_urls:
             task = progress.add_task("[bold green]Phase 4: Fingerprinting...", total=None)
-            whatweb_data = await run_whatweb(http_urls)
+            whatweb_data = await run_whatweb(http_urls, timeout=timeout or 3600)
             state.mark_done("whatweb", whatweb_data)
             progress.remove_task(task)
             console.print(f"  ✅ [green]Fingerprint:[/] Info collected")
@@ -157,7 +160,7 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
             crawled_urls = state.get_result("crawl")
         elif http_urls:
             task = progress.add_task("[bold green]Phase 5: Crawling...", total=None)
-            crawled_urls = await run_katana(http_urls)
+            crawled_urls = await run_katana(http_urls, timeout=timeout or 3600)
             state.mark_done("crawl", crawled_urls)
             progress.remove_task(task)
             console.print(f"  ✅ [green]Crawl:[/] {len(crawled_urls)} endpoints")

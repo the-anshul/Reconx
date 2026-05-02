@@ -14,25 +14,16 @@
 
 ---
 
-## 📐 Usage Modes
+## 🚀 ReconX v2.0.0 — Major Update
 
-ReconX do tareeqon se chalaya ja sakta hai:
+ReconX ab aur bhi powerful aur easy-to-use ho gaya hai:
 
-### 1. Interactive Shell Mode (Metasploit Style)
-Sirf tool ko run karein, ye aapse commands maangega:
-```bash
-python3 main.py
-```
-And then type:
-```bash
-reconx > scan -d example.com
-```
+### 🆕 Interactive Menu Mode (Recommended)
+Ab aapko commands yaad rakhne ki zaroorat nahi. Sirf `python3 main.py` run karein aur menu se options select karein. Isme clear screens aur detailed execution plans hain.
 
-### 2. Direct CLI Mode
-Seedha terminal se command run karein:
-```bash
-python3 main.py scan -d example.com
-```
+### 📐 Usage Modes
+1.  **Menu Mode:** `python3 main.py` (Sabse asaan aur interactive)
+2.  **CLI Mode:** `python3 main.py scan -d example.com` (Direct automation ke liye)
 
 ---
 

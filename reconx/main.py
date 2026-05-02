@@ -399,6 +399,10 @@ def run_interactive_shell():
 
 def run_interactive_menu():
     config = load_config()
+    # Version 2 has NO time limit
+    if "general" not in config: config["general"] = {}
+    config["general"]["timeout"] = 0 
+    
     banner_style = config.get("general", {}).get("banner_style", "standard")
     
     while True:
