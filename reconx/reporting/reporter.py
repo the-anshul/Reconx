@@ -149,8 +149,7 @@ def generate_report(domain: str, assets: list[Asset], config: dict) -> str:
 
     saved_path = ""
     if "json" in formats:
-        console.print("\n[bold cyan]Save report? (y/n): [/]", end="")
-        choice = input().strip().lower()
+        choice = console.input("\n[bold cyan]Save report? (y/n): [/]").strip().lower()
         if choice == 'y':
             saved_path = save_json_report(domain, assets, output_dir)
         else:

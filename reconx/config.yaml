@@ -3,9 +3,9 @@
 
 general:
   threads: 20
-  timeout: 30          # seconds per tool
+  timeout: 300          # 5 minutes per tool
   output_dir: "output"
-  log_level: "INFO"    # DEBUG | INFO | WARNING | ERROR
+  log_level: "INFO"
   banner_style: "standard"
 
 modules:
