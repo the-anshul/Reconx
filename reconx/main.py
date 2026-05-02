@@ -239,23 +239,33 @@ def cmd_banner(args):
     config_path = args.config
     config = load_config(config_path)
     
+    available_styles = list(BANNERS.keys())
+    current_style = config.get("general", {}).get("banner_style", "standard")
+
     if args.set:
         style = args.set.lower()
         if style in BANNERS:
-            config["general"]["banner_style"] = style
-            with open(config_path, "w") as f:
-                yaml.dump(config, f)
-            console.print(f"[green]✅ Banner style set to: [bold]{style}[/][/]")
-            console.print(get_banner(style))
+            new_style = style
         else:
             console.print(f"[red]❌ Style '{style}' not found.[/]")
-            console.print(f"Available styles: {', '.join(BANNERS.keys())}")
+            console.print(f"Available styles: {', '.join(available_styles)}")
+            return
     else:
-        # Just list available banners
-        console.print("[bold cyan]Available Banner Styles:[/]")
-        for name, art in BANNERS.items():
-            console.print(f"\n[bold yellow]--- {name.upper()} ---[/]")
-            console.print(art)
+        # Cycle to the next style
+        try:
+            current_idx = available_styles.index(current_style)
+            next_idx = (current_idx + 1) % len(available_styles)
+        except ValueError:
+            next_idx = 0
+        new_style = available_styles[next_idx]
+
+    # Save and show
+    config["general"]["banner_style"] = new_style
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+    
+    console.print(f"[green]🔄 Switched banner to: [bold]{new_style}[/][/]")
+    console.print(get_banner(new_style))
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
