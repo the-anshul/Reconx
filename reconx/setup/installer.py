@@ -53,7 +53,7 @@ def _install_nmap() -> bool:
     console.print(f"  [cyan]→ Installing nmap via system package manager...[/]")
     try:
         if os_name == "linux":
-            cmd = "sudo apt-get install -y nmap"
+            cmd = "apt-get install -y nmap"
         elif os_name == "darwin":
             cmd = "brew install nmap"
         elif os_name == "windows":
