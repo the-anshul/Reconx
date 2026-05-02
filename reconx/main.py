@@ -130,16 +130,20 @@ def cmd_scan(args):
         config["modules"]["vuln"] = False
 
     # Safety: confirm active scan
+    is_interactive = getattr(args, 'interactive', False)
     needs_active = config.get("modules", {}).get("enum", True) or \
                    config.get("modules", {}).get("vuln", True)
     safety_cfg = config.get("safety", {})
-    if needs_active and safety_cfg.get("confirm_active", True):
+
+    if needs_active and safety_cfg.get("confirm_active", True) and not is_interactive:
         if not confirm_active_scan(domain):
             console.print("[dim]Scan cancelled.[/]")
             sys.exit(0)
 
-    banner_style = config.get("general", {}).get("banner_style", "standard")
-    console.print(get_banner(banner_style))
+    if not is_interactive:
+        banner_style = config.get("general", {}).get("banner_style", "standard")
+        console.print(get_banner(banner_style))
+    
     console.print(f"[bold cyan]🎯 Target:[/] [bold white]{domain}[/]\n")
 
     # Run pipeline
@@ -176,8 +180,11 @@ def cmd_resume(args):
     completed = state.get("completed", [])
     pending   = [p for p in ["recon","dns","http","ports","vulns"] if p not in completed]
 
-    banner_style = config.get("general", {}).get("banner_style", "standard")
-    console.print(get_banner(banner_style))
+    is_interactive = getattr(args, 'interactive', False)
+    if not is_interactive:
+        banner_style = config.get("general", {}).get("banner_style", "standard")
+        console.print(get_banner(banner_style))
+    
     console.print(f"[bold cyan]↩ Resuming scan for:[/] [bold white]{domain}[/]")
     console.print(f"  ✅ Completed: {', '.join(completed) or 'none'}")
     console.print(f"  ⏳ Pending:   {', '.join(pending) or 'none'}\n")
@@ -225,8 +232,11 @@ def cmd_report(args):
         console.print("[yellow]⚠ No recon data in state — run a full scan first[/]")
         sys.exit(1)
 
-    banner_style = config.get("general", {}).get("banner_style", "standard")
-    console.print(get_banner(banner_style))
+    is_interactive = getattr(args, 'interactive', False)
+    if not is_interactive:
+        banner_style = config.get("general", {}).get("banner_style", "standard")
+        console.print(get_banner(banner_style))
+    
     console.print(f"[bold cyan]📊 Generating report for:[/] [bold white]{domain}[/]\n")
     assets = correlate(subdomains, dns_data, http_data, port_data, vuln_data)
     generate_report(domain, assets, config)
@@ -345,6 +355,7 @@ def main():
                 # Parse the command line input
                 try:
                     args = parser.parse_args(shlex.split(cmd_line))
+                    args.interactive = True # Set interactive flag
                 except SystemExit:
                     # Argparse handles help and errors by exiting, we catch it to stay in loop
                     continue
