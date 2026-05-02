@@ -32,6 +32,7 @@ if sys.stderr.encoding != "utf-8":
 import yaml
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 from rich import print as rprint
 
 from core.banners import get_banner, BANNERS
@@ -336,42 +337,149 @@ def main():
 
     parser = build_parser()
 
-    # If no arguments, enter Interactive Shell Mode
+    # If no arguments, enter Version Selector
     if len(sys.argv) == 1:
         config = load_config()
         banner_style = config.get("general", {}).get("banner_style", "standard")
+        clear_screen()
         console.print(get_banner(banner_style))
-        console.print("[bold green]Welcome to ReconX Interactive Shell![/]")
-        console.print("[dim]Type 'help' for commands or 'exit' to quit.[/]\n")
-
-        while True:
-            try:
-                cmd_line = console.input("[bold cyan]reconx > [/]").strip()
-                if not cmd_line:
-                    continue
-                if cmd_line.lower() in ["exit", "quit"]:
-                    break
-                
-                # Parse the command line input
-                try:
-                    args = parser.parse_args(shlex.split(cmd_line))
-                    args.interactive = True # Set interactive flag
-                except SystemExit:
-                    # Argparse handles help and errors by exiting, we catch it to stay in loop
-                    continue
-
-                execute_command(args)
-            except KeyboardInterrupt:
-                console.print("\n[yellow]Use 'exit' to quit.[/]")
-            except Exception as e:
-                console.print(f"[red]❌ Error: {e}[/]")
         
-        console.print("[bold cyan]Goodbye![/]")
+        console.print(Panel("[bold white]Select Interface Version[/]", style="blue"))
+        console.print("[bold cyan]1.[/] [bold white]Interactive Shell Mode[/] (Classic 'reconx >' style)")
+        console.print("[bold cyan]2.[/] [bold white]Interactive Menu Mode[/] (New guided list style)")
+        
+        choice = console.input("\n[bold yellow]Select Version [1 or 2]: [/]").strip()
+        
+        if choice == "1":
+            run_interactive_shell()
+        elif choice == "2":
+            run_interactive_menu()
+        else:
+            console.print("[red]Invalid choice. Exiting.[/]")
         return
 
     # Normal CLI mode
     args = parser.parse_args()
     execute_command(args)
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def run_interactive_shell():
+    config = load_config()
+    banner_style = config.get("general", {}).get("banner_style", "standard")
+    parser = build_parser()
+    
+    clear_screen()
+    console.print(get_banner(banner_style))
+    console.print("[bold green]Welcome to ReconX Interactive Shell (v1)![/]")
+    console.print("[dim]Type 'help' for commands or 'exit' to quit.[/]\n")
+
+    while True:
+        try:
+            cmd_line = console.input("[bold cyan]reconx > [/]").strip()
+            if not cmd_line:
+                continue
+            if cmd_line.lower() in ["exit", "quit"]:
+                break
+            
+            try:
+                args = parser.parse_args(shlex.split(cmd_line))
+                args.interactive = True 
+            except SystemExit:
+                continue
+
+            execute_command(args)
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Use 'exit' to quit.[/]")
+        except Exception as e:
+            console.print(f"[red]❌ Error: {e}[/]")
+    
+    console.print("[bold cyan]Goodbye![/]")
+
+def run_interactive_menu():
+    config = load_config()
+    banner_style = config.get("general", {}).get("banner_style", "standard")
+    
+    while True:
+        clear_screen()
+        console.print(get_banner(banner_style))
+        
+        table = Table(title="[bold magenta]Main Menu[/]", box=None, show_header=False)
+        table.add_column("Key", style="bold cyan")
+        table.add_column("Operation", style="bold white")
+        
+        table.add_row("1", "🚀 Full Automated Scan (Recon → Enum → Vuln)")
+        table.add_row("2", "🔍 Recon Only (Passive Discovery)")
+        table.add_row("3", "🕷  Deep Crawling & Vuln Scan (Katana + Nuclei)")
+        table.add_row("4", "📡 Port Scan & Service Detection (Nmap)")
+        table.add_row("5", "📊 View Existing Reports")
+        table.add_row("6", "🎨 Change Banner Style")
+        table.add_row("7", "❌ Exit")
+        
+        console.print(table)
+        console.print("\n[dim]Select an option [1-7][/]")
+        
+        choice = console.input("[bold yellow]reconx > [/]").strip()
+        
+        if choice == "7":
+            console.print("[bold cyan]Goodbye![/]")
+            break
+        elif choice == "6":
+            cmd_banner(argparse.Namespace(set=None, config="config.yaml"))
+            input("\nPress Enter to continue...")
+            continue
+            
+        # For scan options, ask for target
+        if choice in ["1", "2", "3", "4"]:
+            clear_screen()
+            console.print(get_banner(banner_style))
+            console.print(Panel(f"[bold white]Target Selection[/]", style="blue"))
+            domain = console.input("[bold cyan]Enter Target Domain (e.g. example.com): [/]").strip()
+            if not domain: continue
+            
+            # Show what will be run
+            clear_screen()
+            console.print(get_banner(banner_style))
+            console.print(f"[bold cyan]🎯 Target:[/] [bold white]{domain}[/]\n")
+            
+            plan = Table(title="[bold yellow]Execution Plan[/]", box=None)
+            plan.add_column("Step", style="bold green")
+            plan.add_column("Description", style="dim")
+            
+            if choice == "1":
+                plan.add_row("Recon", "Find subdomains using subfinder/amass/assetfinder")
+                plan.add_row("DNS/HTTP", "Resolve IPs and probe for live web services")
+                plan.add_row("Crawl", "Deep crawl hidden endpoints using Katana")
+                plan.add_row("Fingerprint", "Advanced tech detection using WhatWeb")
+                plan.add_row("Ports", "Identify open ports and versions using Nmap")
+                plan.add_row("Vulns", "Automated vulnerability scan using Nuclei")
+                cmd = f"scan -d {domain}"
+            elif choice == "2":
+                plan.add_row("Recon", "Passive subdomain discovery only")
+                cmd = f"scan -d {domain} --quick"
+            elif choice == "3":
+                plan.add_row("Crawl", "Crawl endpoints and check for vulnerabilities")
+                cmd = f"scan -d {domain} --no-recon" # Custom handling might be needed
+            elif choice == "4":
+                plan.add_row("Port Scan", "Detailed network service discovery")
+                cmd = f"scan -d {domain} --no-vuln"
+
+            console.print(plan)
+            confirm = console.input("\n[bold green]Start scan? (y/n): [/]").strip().lower()
+            if confirm == 'y':
+                parser = build_parser()
+                args = parser.parse_args(shlex.split(cmd))
+                args.interactive = True
+                execute_command(args)
+                input("\nScan complete. Press Enter to return to menu...")
+        
+        elif choice == "5":
+            domain = console.input("[bold cyan]Enter domain to view report: [/]").strip()
+            if domain:
+                args = argparse.Namespace(command="report", domain=domain, config="config.yaml")
+                cmd_report(args)
+                input("\nPress Enter to return to menu...")
 
 def execute_command(args):
     dispatch = {
@@ -390,7 +498,6 @@ def execute_command(args):
             console.print("\n[yellow]⚠ Interrupted. State saved if applicable.[/]")
         except Exception as e:
             console.print(f"[red]❌ Execution failed: {e}[/]")
-
 
 if __name__ == "__main__":
     main()
