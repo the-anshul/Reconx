@@ -34,6 +34,16 @@ REQUIRED_TOOLS = {
         "install_hint": "go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
         "critical": True,
     },
+    "katana": {
+        "version_flag": "-version",
+        "install_hint": "go install github.com/projectdiscovery/katana/cmd/katana@latest",
+        "critical": False,
+    },
+    "assetfinder": {
+        "version_flag": "-version",
+        "install_hint": "go install github.com/tomnomnom/assetfinder@latest",
+        "critical": False,
+    },
     "nmap": {
         "version_flag": "--version",
         "install_hint": "https://nmap.org/download.html",

@@ -7,13 +7,14 @@ import asyncio
 import logging
 from adapters.subfinder import run_subfinder
 from adapters.amass import run_amass
+from adapters.assetfinder import run_assetfinder
 
 logger = logging.getLogger("reconx.modules.recon")
 
 
 async def run_recon(domain: str, config: dict) -> list[str]:
     """
-    Passive subdomain enumeration using subfinder + amass.
+    Passive subdomain enumeration using multiple tools.
     Returns deduplicated list of subdomains.
     """
     logger.info(f"[recon] Starting passive recon for: {domain}")
@@ -26,6 +27,9 @@ async def run_recon(domain: str, config: dict) -> list[str]:
     # Always run subfinder
     sf_flags = recon_cfg.get("subfinder", {}).get("flags", "-silent")
     tasks.append(run_subfinder(domain, timeout=timeout * 2, extra_flags=sf_flags))
+
+    # Run assetfinder
+    tasks.append(run_assetfinder(domain, timeout=timeout * 2))
 
     # Run amass if enabled (slower, so longer timeout)
     amass_flags = recon_cfg.get("amass", {}).get("flags", "")

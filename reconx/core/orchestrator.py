@@ -13,6 +13,7 @@ from core.state_manager import StateManager
 from modules.recon import run_recon
 from modules.enum import run_dns_enum, run_http_enum
 from modules.vuln import run_port_scan, run_vuln_scan
+from adapters.katana import run_katana
 from models.asset import Asset, PortInfo, VulnInfo
 
 logger = logging.getLogger("reconx.orchestrator")
@@ -154,39 +155,51 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
             state.mark_done("http", http_data)
             progress.remove_task(task)
 
-        console.print(f"  ✅ [green]HTTP:[/] {len(http_data)} web services detected")
-        http_urls = [h["url"] for h in http_data if h.get("url")]
+    # ── PHASE 4: Crawling ───────────────────────────────────────────────
+    crawled_urls = []
+    if state.is_done("crawl") and resume:
+        crawled_urls = state.get_result("crawl")
+        console.print(f"  [dim]↩ Crawl: loaded {len(crawled_urls)} URLs from state[/]")
+    else:
+        task = progress.add_task("[bold green]Phase 4: Deep Crawling (Katana)...", total=None)
+        crawled_urls = await run_katana(http_urls, timeout=600)
+        state.mark_done("crawl", crawled_urls)
+        progress.remove_task(task)
+    
+    console.print(f"  ✅ [green]Crawl:[/] {len(crawled_urls)} unique endpoints discovered")
 
-        # ── PHASE 4: Port Scan ──────────────────────────────────────────────
-        port_data: dict[str, list] = {}
-        if config.get("modules", {}).get("enum", True):
-            if state.is_done("ports") and resume:
-                port_data = state.get_result("ports")
-                console.print(f"  [dim]↩ Ports: loaded from state[/]")
-            else:
-                task = progress.add_task("[bold green]Phase 4: Port Scanning...", total=None)
-                # Scan unique IPs to avoid duplicate nmap runs
-                unique_ips = list({d["ip"] for d in dns_data if d.get("ip")})
-                port_data = await run_port_scan(unique_ips, config)
-                state.mark_done("ports", port_data)
-                progress.remove_task(task)
+    # ── PHASE 5: Port Scan ──────────────────────────────────────────────
+    port_data: dict[str, list] = {}
+    if config.get("modules", {}).get("enum", True):
+        if state.is_done("ports") and resume:
+            port_data = state.get_result("ports")
+            console.print(f"  [dim]↩ Ports: loaded from state[/]")
+        else:
+            task = progress.add_task("[bold green]Phase 5: Port Scanning...", total=None)
+            # Scan unique IPs to avoid duplicate nmap runs
+            unique_ips = list({d["ip"] for d in dns_data if d.get("ip")})
+            port_data = await run_port_scan(unique_ips, config)
+            state.mark_done("ports", port_data)
+            progress.remove_task(task)
 
-            total_ports = sum(len(v) for v in port_data.values())
-            console.print(f"  ✅ [green]Ports:[/] {total_ports} open ports found")
+        total_ports = sum(len(v) for v in port_data.values())
+        console.print(f"  ✅ [green]Ports:[/] {total_ports} open ports found")
 
-        # ── PHASE 5: Vuln Scan ──────────────────────────────────────────────
-        vuln_data: list[dict] = []
-        if config.get("modules", {}).get("vuln", True):
-            if state.is_done("vulns") and resume:
-                vuln_data = state.get_result("vulns")
-                console.print(f"  [dim]↩ Vulns: loaded {len(vuln_data)} findings from state[/]")
-            else:
-                task = progress.add_task("[bold green]Phase 5: Vulnerability Scan...", total=None)
-                vuln_data = await run_vuln_scan(http_urls, config)
-                state.mark_done("vulns", vuln_data)
-                progress.remove_task(task)
+    # ── PHASE 6: Vuln Scan ──────────────────────────────────────────────
+    vuln_data: list[dict] = []
+    if config.get("modules", {}).get("vuln", True):
+        if state.is_done("vulns") and resume:
+            vuln_data = state.get_result("vulns")
+            console.print(f"  [dim]↩ Vulns: loaded {len(vuln_data)} findings from state[/]")
+        else:
+            task = progress.add_task("[bold green]Phase 6: Vulnerability Scan...", total=None)
+            # Use BOTH http_urls and crawled_urls for Nuclei
+            scan_targets = list(set(http_urls + crawled_urls))
+            vuln_data = await run_vuln_scan(scan_targets, config)
+            state.mark_done("vulns", vuln_data)
+            progress.remove_task(task)
 
-            console.print(f"  ✅ [green]Vulns:[/] {len(vuln_data)} findings")
+        console.print(f"  ✅ [green]Vulns:[/] {len(vuln_data)} findings")
 
     # ── CORRELATION ─────────────────────────────────────────────────────────
     console.print("\n[bold cyan]🔗 Correlating intelligence...[/]")

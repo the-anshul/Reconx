@@ -19,6 +19,8 @@ GO_TOOLS = {
     "dnsx":      "github.com/projectdiscovery/dnsx/cmd/dnsx@latest",
     "httpx":     "github.com/projectdiscovery/httpx/cmd/httpx@latest",
     "nuclei":    "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
+    "katana":    "github.com/projectdiscovery/katana/cmd/katana@latest",
+    "assetfinder": "github.com/tomnomnom/assetfinder@latest",
     "amass":     "github.com/owasp-amass/amass/v4/...@master",
 }
 
