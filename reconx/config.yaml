@@ -6,6 +6,7 @@ general:
   timeout: 30          # seconds per tool
   output_dir: "output"
   log_level: "INFO"    # DEBUG | INFO | WARNING | ERROR
+  banner_style: "standard"
 
 modules:
   recon: true          # subfinder + amass

@@ -40,8 +40,8 @@ async def run_recon(domain: str, config: dict) -> list[str]:
             continue
         all_subs.update(result)
 
-    # Remove parent domain if it appeared
-    all_subs.discard(domain)
+    # Add the target domain itself to the set to ensure it gets scanned
+    all_subs.add(domain)
 
     max_subs = config.get("safety", {}).get("max_subdomains", 500)
     if len(all_subs) > max_subs:

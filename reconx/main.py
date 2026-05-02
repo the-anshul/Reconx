@@ -33,22 +33,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich import print as rprint
 
+from core.banners import get_banner, BANNERS
+
 console = Console()
 
-# ── Banner ────────────────────────────────────────────────────────────────────
-
-BANNER = """
-[bold cyan]
- ██████╗ ███████╗ ██████╗ ██████╗ ███╗   ██╗██╗  ██╗
- ██╔══██╗██╔════╝██╔════╝██╔═══██╗████╗  ██║╚██╗██╔╝
- ██████╔╝█████╗  ██║     ██║   ██║██╔██╗ ██║ ╚███╔╝ 
- ██╔══██╗██╔══╝  ██║     ██║   ██║██║╚██╗██║ ██╔██╗ 
- ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██╔╝ ██╗
- ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝
-[/bold cyan]
-[dim]  Recon + Enumeration + Vuln Automation Framework[/dim]
-[cyan]  ─────────────────────────────────────────────────[/cyan]
-"""
+# Banner logic is now moved to core/banners.py
 
 
 # ── Config loader ─────────────────────────────────────────────────────────────
@@ -148,7 +137,8 @@ def cmd_scan(args):
             console.print("[dim]Scan cancelled.[/]")
             sys.exit(0)
 
-    console.print(BANNER)
+    banner_style = config.get("general", {}).get("banner_style", "standard")
+    console.print(get_banner(banner_style))
     console.print(f"[bold cyan]🎯 Target:[/] [bold white]{domain}[/]\n")
 
     # Run pipeline
@@ -185,7 +175,8 @@ def cmd_resume(args):
     completed = state.get("completed", [])
     pending   = [p for p in ["recon","dns","http","ports","vulns"] if p not in completed]
 
-    console.print(BANNER)
+    banner_style = config.get("general", {}).get("banner_style", "standard")
+    console.print(get_banner(banner_style))
     console.print(f"[bold cyan]↩ Resuming scan for:[/] [bold white]{domain}[/]")
     console.print(f"  ✅ Completed: {', '.join(completed) or 'none'}")
     console.print(f"  ⏳ Pending:   {', '.join(pending) or 'none'}\n")
@@ -233,13 +224,37 @@ def cmd_report(args):
         console.print("[yellow]⚠ No recon data in state — run a full scan first[/]")
         sys.exit(1)
 
-    console.print(BANNER)
+    banner_style = config.get("general", {}).get("banner_style", "standard")
+    console.print(get_banner(banner_style))
     console.print(f"[bold cyan]📊 Generating report for:[/] [bold white]{domain}[/]\n")
     assets = correlate(subdomains, dns_data, http_data, port_data, vuln_data)
     generate_report(domain, assets, config)
 
 
 # ── Argument parser ───────────────────────────────────────────────────────────
+
+def cmd_banner(args):
+    """reconx banner [--set style]"""
+    config_path = args.config
+    config = load_config(config_path)
+    
+    if args.set:
+        style = args.set.lower()
+        if style in BANNERS:
+            config["general"]["banner_style"] = style
+            with open(config_path, "w") as f:
+                yaml.dump(config, f)
+            console.print(f"[green]✅ Banner style set to: [bold]{style}[/][/]")
+            console.print(get_banner(style))
+        else:
+            console.print(f"[red]❌ Style '{style}' not found.[/]")
+            console.print(f"Available styles: {', '.join(BANNERS.keys())}")
+    else:
+        # Just list available banners
+        console.print("[bold cyan]Available Banner Styles:[/]")
+        for name, art in BANNERS.items():
+            console.print(f"\n[bold yellow]--- {name.upper()} ---[/]")
+            console.print(art)
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -282,6 +297,11 @@ Examples:
     p_report.add_argument("-d", "--domain", required=True, help="Target domain")
     p_report.add_argument("--config", default="config.yaml", help="Path to config.yaml")
 
+    # ── banner ─────────────────────────────────────────────────────────────
+    p_banner = sub.add_parser("banner", help="View or change the CLI banner style")
+    p_banner.add_argument("--set", choices=BANNERS.keys(), help="Set a new default banner style")
+    p_banner.add_argument("--config", default="config.yaml", help="Path to config.yaml")
+
     return parser
 
 
@@ -301,6 +321,7 @@ def main():
         "scan":   cmd_scan,
         "resume": cmd_resume,
         "report": cmd_report,
+        "banner": cmd_banner,
     }
 
     handler = dispatch.get(args.command)
