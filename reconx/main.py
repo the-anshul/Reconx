@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import os
+import shlex
 import urllib.parse
 from pathlib import Path
 
@@ -308,14 +309,50 @@ Examples:
 # ── Entry ─────────────────────────────────────────────────────────────────────
 
 def main():
-    # Add reconx dir to sys.path so imports work from any working directory
+    # Add reconx dir to sys.path
     reconx_root = Path(__file__).parent
     if str(reconx_root) not in sys.path:
         sys.path.insert(0, str(reconx_root))
 
     parser = build_parser()
-    args = parser.parse_args()
 
+    # If no arguments, enter Interactive Shell Mode
+    if len(sys.argv) == 1:
+        config = load_config()
+        banner_style = config.get("general", {}).get("banner_style", "standard")
+        console.print(get_banner(banner_style))
+        console.print("[bold green]Welcome to ReconX Interactive Shell![/]")
+        console.print("[dim]Type 'help' for commands or 'exit' to quit.[/]\n")
+
+        while True:
+            try:
+                cmd_line = console.input("[bold cyan]reconx > [/]").strip()
+                if not cmd_line:
+                    continue
+                if cmd_line.lower() in ["exit", "quit"]:
+                    break
+                
+                # Parse the command line input
+                try:
+                    args = parser.parse_args(shlex.split(cmd_line))
+                except SystemExit:
+                    # Argparse handles help and errors by exiting, we catch it to stay in loop
+                    continue
+
+                execute_command(args)
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Use 'exit' to quit.[/]")
+            except Exception as e:
+                console.print(f"[red]❌ Error: {e}[/]")
+        
+        console.print("[bold cyan]Goodbye![/]")
+        return
+
+    # Normal CLI mode
+    args = parser.parse_args()
+    execute_command(args)
+
+def execute_command(args):
     dispatch = {
         "setup":  cmd_setup,
         "scan":   cmd_scan,
@@ -329,10 +366,9 @@ def main():
         try:
             handler(args)
         except KeyboardInterrupt:
-            console.print("\n[yellow]⚠ Interrupted by user. State saved — use 'reconx resume' to continue.[/]")
-            sys.exit(0)
-    else:
-        parser.print_help()
+            console.print("\n[yellow]⚠ Interrupted. State saved if applicable.[/]")
+        except Exception as e:
+            console.print(f"[red]❌ Execution failed: {e}[/]")
 
 
 if __name__ == "__main__":

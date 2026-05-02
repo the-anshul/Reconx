@@ -14,6 +14,28 @@
 
 ---
 
+## 📐 Usage Modes
+
+ReconX do tareeqon se chalaya ja sakta hai:
+
+### 1. Interactive Shell Mode (Metasploit Style)
+Sirf tool ko run karein, ye aapse commands maangega:
+```bash
+python3 main.py
+```
+And then type:
+```bash
+reconx > scan -d example.com
+```
+
+### 2. Direct CLI Mode
+Seedha terminal se command run karein:
+```bash
+python3 main.py scan -d example.com
+```
+
+---
+
 ## 🛠 Commands & Working (How to Use)
 
 Is tool mein total 5 main commands hain. Har command ka kaam niche diya gaya hai:
