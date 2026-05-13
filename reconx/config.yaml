@@ -12,6 +12,7 @@ modules:
   recon: true          # subfinder + amass
   dns: true            # dnsx
   http: true           # httpx
+  crawl: true          # katana
   enum: true           # nmap
   vuln: true           # nuclei
 

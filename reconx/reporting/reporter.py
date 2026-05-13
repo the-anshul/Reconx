@@ -32,6 +32,7 @@ def print_summary(domain: str, assets: list[Asset]):
     """Print rich CLI summary report."""
 
     live_assets   = [a for a in assets if a.is_live]
+    dead_assets   = [a for a in assets if not a.is_live]
     total_ports   = sum(len(a.ports) for a in assets)
     total_vulns   = sum(len(a.vulns) for a in assets)
     critical_count = sum(1 for a in assets for v in a.vulns if v.severity == "critical")
@@ -41,7 +42,7 @@ def print_summary(domain: str, assets: list[Asset]):
     summary = (
         f"[bold white]Target:[/]       {domain}\n"
         f"[bold white]Subdomains:[/]   {len(assets)}\n"
-        f"[bold white]Live Hosts:[/]   {len(live_assets)}\n"
+        f"  └─ [green]Live:[/] {len(live_assets)}  |  [red]Dead:[/] {len(dead_assets)}\n"
         f"[bold white]Open Ports:[/]   {total_ports}\n"
         f"[bold white]Vulnerabilities:[/] {total_vulns}  "
         f"([bold red]{critical_count} critical[/] / [red]{high_count} high[/])"
@@ -58,10 +59,11 @@ def print_summary(domain: str, assets: list[Asset]):
     table.add_column("Domain",      style="bold white",  no_wrap=True)
     table.add_column("IP",          style="dim")
     table.add_column("HTTP",        justify="center")
+    table.add_column("Title",       style="italic",      max_width=25)
     table.add_column("Ports",       justify="center")
-    table.add_column("Tech",        style="dim",         max_width=30)
+    table.add_column("Tech",        style="dim",         max_width=20)
     table.add_column("Vulns",       justify="center")
-    table.add_column("Severity",    justify="center")
+    table.add_column("Source",      style="dim cyan",    max_width=15)
 
     for asset in assets:
         status_str = (
@@ -74,27 +76,24 @@ def print_summary(domain: str, assets: list[Asset]):
             ports_str += f" (+{len(asset.ports)-5})"
 
         tech_str = ", ".join(asset.technologies[:3]) if asset.technologies else "-"
+        title_str = asset.title[:22] + ".." if asset.title and len(asset.title) > 22 else (asset.title or "-")
+        
+        sources_str = ", ".join(asset.sources[:2])
+        if len(asset.sources) > 2:
+            sources_str += ".."
 
         vuln_count = len(asset.vulns)
         vuln_str   = str(vuln_count) if vuln_count else "[dim]-[/]"
-
-        # Worst severity
-        sev_order = ["critical", "high", "medium", "low", "info"]
-        worst = next(
-            (s for s in sev_order if any(v.severity == s for v in asset.vulns)), None
-        )
-        sev_str = (
-            f"[{SEVERITY_COLOR[worst]}]{worst.upper()}[/]" if worst else "[dim]-[/]"
-        )
 
         table.add_row(
             asset.domain,
             asset.ip or "-",
             status_str,
+            title_str,
             ports_str or "-",
             tech_str,
             vuln_str,
-            sev_str,
+            sources_str or "manual",
         )
 
     console.print(table)

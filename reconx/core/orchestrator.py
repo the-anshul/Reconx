@@ -21,29 +21,34 @@ logger = logging.getLogger("reconx.orchestrator")
 console = Console()
 
 
-def correlate(subdomains, dns_data, http_data, port_data, vuln_data, whatweb_data=None) -> list[Asset]:
+def correlate(subdomain_map: dict[str, set[str]], dns_data, http_data, port_data, vuln_data, whatweb_data=None) -> list[Asset]:
     """Combine data from all tools into a list of Asset objects."""
     assets_dict: dict[str, Asset] = {}
     
     # Initialize assets from subdomains
-    for sub in subdomains:
-        assets_dict[sub] = Asset(domain=sub)
+    for sub, sources in subdomain_map.items():
+        assets_dict[sub] = Asset(domain=sub, sources=list(sources))
 
     # Merge DNS info
     for d in dns_data:
-        domain = d.get("host")
+        domain = d.get("domain") or d.get("host")
         if domain in assets_dict:
             assets_dict[domain].ip = d.get("ip")
             assets_dict[domain].cnames = d.get("cnames", [])
 
     # Merge HTTP info
     for h in http_data:
-        domain = h.get("input") or h.get("url", "").replace("http://", "").replace("https://", "").split("/")[0]
+        domain = (
+            h.get("domain")
+            or h.get("input")
+            or h.get("url", "").replace("http://", "").replace("https://", "").split("/")[0]
+        )
         if domain in assets_dict:
             assets_dict[domain].is_live = True
-            assets_dict[domain].http_status = h.get("status_code")
+            assets_dict[domain].http_status = h.get("status") or h.get("status_code")
             assets_dict[domain].http_url = h.get("url")
-            assets_dict[domain].technologies.extend(h.get("tech", []))
+            assets_dict[domain].title = h.get("title")
+            assets_dict[domain].technologies.extend(h.get("technologies") or h.get("tech", []))
 
     # Merge WhatWeb tech info (Enrichment)
     if whatweb_data:
@@ -55,6 +60,13 @@ def correlate(subdomains, dns_data, http_data, port_data, vuln_data, whatweb_dat
                 new_techs = list(plugins.keys())
                 assets_dict[domain].technologies.extend(new_techs)
                 assets_dict[domain].technologies = list(set(assets_dict[domain].technologies))
+                
+                # If title is missing from httpx, try to get it from WhatWeb if available
+                if not assets_dict[domain].title:
+                    # WhatWeb output format varies, but sometimes title is in plugins
+                    title_plugin = plugins.get("Title")
+                    if title_plugin and isinstance(title_plugin, list) and len(title_plugin) > 0:
+                        assets_dict[domain].title = str(title_plugin[0])
 
     # Merge Port info
     for ip, raw_ports in port_data.items():
@@ -77,7 +89,7 @@ def correlate(subdomains, dns_data, http_data, port_data, vuln_data, whatweb_dat
                 ))
 
     assets = list(assets_dict.values())
-    assets.sort(key=lambda a: len(a.vulns), reverse=True)
+    assets.sort(key=lambda a: (len(a.vulns), a.is_live), reverse=True)
     return assets
 
 
@@ -89,11 +101,12 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
     # Get timeout from config, if 0 then set to None (infinite)
     t_config = config.get("general", {}).get("timeout", 300)
     timeout = None if t_config == 0 else t_config
+    module_cfg = config.get("modules", {})
 
     phases = ["recon", "dns", "http", "whatweb", "crawl", "ports", "vulns"]
     state.set_pending(phases)
 
-    subdomains = []
+    subdomain_map = {}
     dns_data = []
     http_data = []
     http_urls = []
@@ -112,16 +125,18 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
 
         # 1. Recon
         if state.is_done("recon") and resume:
-            subdomains = state.get_result("recon")
+            subdomain_map = state.get_result("recon")
         else:
             task = progress.add_task("[bold green]Phase 1: Recon...", total=None)
-            subdomains = await run_recon(domain, config)
-            state.mark_done("recon", subdomains)
+            subdomain_map = await run_recon(domain, config)
+            state.mark_done("recon", subdomain_map)
             progress.remove_task(task)
-        console.print(f"  ✅ [green]Recon:[/] {len(subdomains)} subdomains found")
+        console.print(f"  ✅ [green]Recon:[/] {len(subdomain_map)} subdomains found")
 
-        if not subdomains:
+        if not subdomain_map:
             return []
+
+        subdomains = list(subdomain_map.keys())
 
         # 2. DNS
         if state.is_done("dns") and resume:
@@ -156,7 +171,10 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
             console.print(f"  ✅ [green]Fingerprint:[/] Info collected")
 
         # 5. Crawl
-        if state.is_done("crawl") and resume:
+        if not module_cfg.get("crawl", True):
+             console.print("  ⏭ [yellow]Crawl:[/] skipped by config")
+             state.mark_done("crawl", [])
+        elif state.is_done("crawl") and resume:
             crawled_urls = state.get_result("crawl")
         elif http_urls:
             task = progress.add_task("[bold green]Phase 5: Crawling...", total=None)
@@ -166,7 +184,10 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
             console.print(f"  ✅ [green]Crawl:[/] {len(crawled_urls)} endpoints")
 
         # 6. Ports
-        if state.is_done("ports") and resume:
+        if not module_cfg.get("enum", True):
+            console.print("  ⏭ [yellow]Ports:[/] skipped (quick mode or config)")
+            state.mark_done("ports", {})
+        elif state.is_done("ports") and resume:
             port_data = state.get_result("ports")
         else:
             task = progress.add_task("[bold green]Phase 6: Port Scan...", total=None)
@@ -177,7 +198,10 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
             console.print(f"  ✅ [green]Ports:[/] Done")
 
         # 7. Vulns
-        if state.is_done("vulns") and resume:
+        if not module_cfg.get("vuln", True):
+            console.print("  ⏭ [yellow]Vulns:[/] skipped (quick mode or config)")
+            state.mark_done("vulns", [])
+        elif state.is_done("vulns") and resume:
             vuln_data = state.get_result("vulns")
         else:
             task = progress.add_task("[bold green]Phase 7: Vuln Scan...", total=None)
@@ -188,5 +212,5 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
             console.print(f"  ✅ [green]Vulns:[/] {len(vuln_data)} findings")
 
     console.print("\n[bold cyan]🔗 Correlating intelligence...[/]")
-    assets = correlate(subdomains, dns_data, http_data, port_data, vuln_data, whatweb_data)
+    assets = correlate(subdomain_map, dns_data, http_data, port_data, vuln_data, whatweb_data)
     return assets

@@ -5,6 +5,7 @@ adapters/dnsx.py — DNS resolution and live host filtering.
 import asyncio
 import json
 import logging
+import socket
 
 logger = logging.getLogger("reconx.adapters.dnsx")
 
@@ -34,6 +35,11 @@ async def run_dnsx(subdomains: list[str], timeout: int = 60) -> list[dict]:
             proc.communicate(input=input_data.encode()), timeout=timeout
         )
 
+        if proc.returncode not in (0, None):
+            error = stderr.decode(errors="replace").strip()
+            logger.warning(f"[dnsx] Tool failed ({proc.returncode}): {error}")
+            return await _resolve_with_python(subdomains)
+
         results = []
         for line in stdout.decode().splitlines():
             line = line.strip()
@@ -50,14 +56,43 @@ async def run_dnsx(subdomains: list[str], timeout: int = 60) -> list[dict]:
                 continue
 
         logger.info(f"[dnsx] {len(results)} live hosts resolved")
-        return results
+        if results:
+            return results
+
+        logger.warning("[dnsx] No results from dnsx; trying Python DNS fallback")
+        return await _resolve_with_python(subdomains)
 
     except asyncio.TimeoutError:
         logger.error(f"[dnsx] Timed out after {timeout}s")
-        return []
+        return await _resolve_with_python(subdomains)
     except FileNotFoundError:
         logger.error("[dnsx] Not found in PATH. Run: reconx setup")
-        return []
+        return await _resolve_with_python(subdomains)
     except Exception as e:
         logger.error(f"[dnsx] Error: {e}")
-        return []
+        return await _resolve_with_python(subdomains)
+
+
+async def _resolve_with_python(subdomains: list[str]) -> list[dict]:
+    """Resolve hosts with stdlib DNS so ReconX still returns useful output."""
+    async def resolve_one(host: str) -> dict | None:
+        try:
+            infos = await asyncio.to_thread(socket.getaddrinfo, host, None, type=socket.SOCK_STREAM)
+            ips = []
+            for info in infos:
+                ip = info[4][0]
+                if ip not in ips:
+                    ips.append(ip)
+            if not ips:
+                return None
+            return {"domain": host, "ip": ips[0], "cnames": []}
+        except socket.gaierror:
+            return None
+        except Exception as e:
+            logger.debug(f"[dnsx:fallback] Could not resolve {host}: {e}")
+            return None
+
+    resolved = await asyncio.gather(*(resolve_one(host) for host in subdomains))
+    results = [item for item in resolved if item]
+    logger.info(f"[dnsx:fallback] {len(results)} live hosts resolved")
+    return results

@@ -32,10 +32,12 @@ class Asset(BaseModel):
     is_live: bool = False
     http_status: int | None = None
     http_url: str | None = None
+    title: str | None = None
     technologies: list[str] = []
     ports: list[PortInfo] = []
     vulns: list[VulnInfo] = []
     cnames: list[str] = []
+    sources: list[str] = []
     discovered_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def summary(self) -> dict:

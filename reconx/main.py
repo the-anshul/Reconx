@@ -123,9 +123,10 @@ def cmd_scan(args):
 
     # Quick mode — disable slow modules
     if args.quick:
+        config["modules"]["crawl"] = False
         config["modules"]["enum"]  = False
         config["modules"]["vuln"]  = False
-        console.print("[yellow]⚡ Quick mode: nmap + nuclei disabled[/]")
+        console.print("[yellow]⚡ Quick mode: crawl + nmap + nuclei disabled[/]")
 
     if args.no_vuln:
         config["modules"]["vuln"] = False
