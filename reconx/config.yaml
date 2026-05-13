@@ -49,3 +49,10 @@ reporting:
   formats:
     - json
   output_prefix: "reconx_report"
+
+ai_analysis:
+  enabled: true
+  provider: "google"   # Options: google, openai
+  model: "gemini-1.5-flash"
+  # api_key is NOT stored here — tool will ask on first run
+  # and save to .env file automatically (safe, never pushed to Git)

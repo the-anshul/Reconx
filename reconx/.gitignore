@@ -1,0 +1,39 @@
+# ── Secrets (KABHI GIT MEIN NAHI JAANA CHAHIYE) ──
+.env
+*.key
+*.pem
+secrets.yaml
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Virtual Environments ──
+.venv/
+venv/
+env/
+ENV/
+
+# ── ReconX Output ──
+output/
+*.json
+!.env.example
+
+# ── IDEs ──
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ── OS Files ──
+.DS_Store
+Thumbs.db
+desktop.ini

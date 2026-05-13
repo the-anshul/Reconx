@@ -11,3 +11,7 @@ rich>=13.0.0
 
 # Optional: faster JSON parsing
 # orjson>=3.9.0
+
+# AI Analysis (optional, install based on your provider)
+google-generativeai>=0.5.0  # For Google Gemini (provider: google)
+# openai>=1.0.0              # For OpenAI GPT   (provider: openai)

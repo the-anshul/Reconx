@@ -16,6 +16,7 @@ from modules.vuln import run_port_scan, run_vuln_scan
 from adapters.katana import run_katana
 from adapters.whatweb import run_whatweb
 from models.asset import Asset, PortInfo, VulnInfo
+from core.analyzer import AIAnalyzer
 
 logger = logging.getLogger("reconx.orchestrator")
 console = Console()
@@ -213,4 +214,14 @@ async def run_pipeline(domain: str, config: dict, resume: bool = False) -> list[
 
     console.print("\n[bold cyan]🔗 Correlating intelligence...[/]")
     assets = correlate(subdomain_map, dns_data, http_data, port_data, vuln_data, whatweb_data)
-    return assets
+
+    # 8. AI Analysis
+    ai_summary = ""
+    if config.get("ai_analysis", {}).get("enabled", False):
+        task = progress.add_task("[bold magenta]Phase 8: AI Analysis...", total=None)
+        analyzer = AIAnalyzer(config)
+        ai_summary = await analyzer.analyze(assets)
+        progress.remove_task(task)
+        console.print("  ✅ [magenta]AI Analysis:[/] Done")
+
+    return assets, ai_summary

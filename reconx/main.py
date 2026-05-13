@@ -152,13 +152,13 @@ def cmd_scan(args):
     from core.orchestrator import run_pipeline
     from reporting.reporter import generate_report
 
-    assets = asyncio.run(run_pipeline(domain, config, resume=False))
+    assets, ai_summary = asyncio.run(run_pipeline(domain, config, resume=False))
 
     if not assets:
         console.print("[yellow]No assets discovered.[/]")
         sys.exit(0)
 
-    generate_report(domain, assets, config)
+    generate_report(domain, assets, config, ai_summary)
 
 
 def cmd_resume(args):
@@ -194,10 +194,10 @@ def cmd_resume(args):
     from core.orchestrator import run_pipeline
     from reporting.reporter import generate_report
 
-    assets = asyncio.run(run_pipeline(domain, config, resume=True))
+    assets, ai_summary = asyncio.run(run_pipeline(domain, config, resume=True))
 
     if assets:
-        generate_report(domain, assets, config)
+        generate_report(domain, assets, config, ai_summary)
 
 
 def cmd_report(args):

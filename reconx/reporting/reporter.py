@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
+from rich.markdown import Markdown
 from rich import box
 
 from models.asset import Asset
@@ -112,6 +113,22 @@ def print_summary(domain: str, assets: list[Asset]):
                 )
 
 
+def print_ai_analysis(ai_summary: str):
+    """Render AI-generated security analysis in a styled panel."""
+    if not ai_summary or "disabled" in ai_summary.lower() or "error" in ai_summary.lower():
+        console.print(f"\n[dim]🤖 AI Analysis: {ai_summary}[/]")
+        return
+
+    console.print(
+        Panel(
+            Markdown(ai_summary),
+            title="[bold magenta]🤖 AI Security Analysis[/]",
+            border_style="magenta",
+            padding=(1, 2),
+        )
+    )
+
+
 def save_json_report(domain: str, assets: list[Asset], output_dir: str = "output") -> str:
     """Save full JSON report to output directory."""
     out = Path(output_dir)
@@ -139,9 +156,13 @@ def save_json_report(domain: str, assets: list[Asset], output_dir: str = "output
     return str(filename)
 
 
-def generate_report(domain: str, assets: list[Asset], config: dict) -> str:
+def generate_report(domain: str, assets: list[Asset], config: dict, ai_summary: str = "") -> str:
     """Main reporting entry point — prints CLI + asks to save files."""
     print_summary(domain, assets)
+
+    # Display AI Analysis if available
+    if ai_summary:
+        print_ai_analysis(ai_summary)
 
     output_dir = config.get("general", {}).get("output_dir", "output")
     formats = config.get("reporting", {}).get("formats", ["json"])
